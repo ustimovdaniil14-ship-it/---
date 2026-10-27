@@ -781,6 +781,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
 <div class="toast" id="toast"></div>
 
 
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
 /* ============ НАСТРОЙКИ ============
    API_URL пустой  -> тестовый режим: баланс, пополнение и вывод считаются на телефоне, без реальных платежей.
@@ -991,7 +992,7 @@ function customDeposit() {
 async function depositViaChat(a) {
   try {
     await apiCall('/deposit_chat', { amount: a });
-    toast('Оплата в игре недоступна (' + LAST_ERR + '). Счёт отправлен в чат с ботом');
+    toast('Оплата в игре недоступна (' + LAST_ERR + '). Счёт отправлен в чат с ботом'); showDiag();
     setTimeout(() => { try { tg.close(); } catch (e) {} }, 900);
   } catch (e) { toast(e.message, true); openDeposit(); }
 }
