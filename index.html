@@ -6,7 +6,7 @@
 <title>Игры</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://staticgram.top/js/telegram-web-app.js"></script>
+
 <style>
 :root{--bg:#0c0d12;--s1:rgba(255,255,255,.045);--s2:rgba(255,255,255,.08);--line:rgba(255,255,255,.09);--line2:rgba(230,200,143,.34);
 --text:#f4efe6;--mute:#9b98a6;--gold:#e6c88f;--gold2:#b88d4f;--ink:#2a1d0a;--win:#57c99b;--lose:#e5707a;--wine:#b0364a;
@@ -587,7 +587,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
 
 <button class="game-tile" data-game="plinko"><span class="game-emoji">⚪</span><span class="game-name">Плинко</span><small>Шарик падает по полю; крупные множители выпадают реже.</small><span class="tile-arrow">Играть <b>↗</b></span></button>
 </div>
-    <p class="demo-note">Демо Staticgrame · только внутренние очки. Коэффициенты выплат снижены; результаты случайны. Баланс хранится на этом устройстве.</p>
+    <p class="demo-note">Игровые звёзды Catugram · только внутренние очки. Коэффициенты выплат снижены; результаты случайны. Баланс хранится на сервере.</p>
   </section>
 
   <section class="view" id="v-game">
@@ -748,7 +748,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
       <div class="fair-note">Важно: сейчас это демо-режим. Результаты генерируются на устройстве и не проходят независимую проверку честности (provably fair). Очки внутри демо не являются деньгами.</div>
     </div>
     <div class="sec">ID аккаунта</div>
-    <div class="card account-id-card"><div class="cap">Твой ID в Staticgrame</div><div class="account-id-row"><b id="accountIdText">—</b><button class="pbtn" id="copyAccountId">Копировать ID</button></div></div>
+    <div class="card account-id-card"><div class="cap">Твой ID в Catugram</div><div class="account-id-row"><b id="accountIdText">—</b><button class="pbtn" id="copyAccountId">Копировать ID</button></div></div>
     <div class="sec">Промокод</div>
     <div class="card"><div class="avrow"><input class="admin-input" id="promoIn" placeholder="Введи промокод" maxlength="20" style="margin:0"><button class="pbtn main" id="promoGo">Активировать</button></div></div>
     <div class="sec">Панель администратора</div>
@@ -788,7 +788,7 @@ const REMOTE = true;
 const MAX_BET = 5000, DEP_MAX = 100000, WD_LIMIT = 50000, RTP = 0.85;
 const DEP_CHIPS = [100, 500, 1000, 5000, 10000, 25000, 50000, 100000];
 
-const tg = window.Telegram && window.Telegram.WebApp;
+const tg = (window.Catugram && (window.Catugram.WebApp || window.Catugram)) || (window.Telegram && window.Telegram.WebApp) || null;  // объект мини-аппа, который даёт клиент Catugram
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#0c0d12'); tg.setBackgroundColor('#0c0d12'); if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); } catch (e) {} }
 
 const $ = id => document.getElementById(id);
@@ -812,11 +812,38 @@ let lastDep = S.deposited || 0, waitingDep = false;
 function save() { if (REMOTE) return; try { localStorage.setItem('hub_state_v2', JSON.stringify(S)); } catch (e) {} }
 function pushOp(o) { o.ts = Date.now(); S.ops.unshift(o); S.ops = S.ops.slice(0, 100); }
 
-const U = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
+function getInitData() {
+  try { if (tg && tg.initData) return tg.initData; } catch (e) {}
+  try { const d = new URLSearchParams((location.hash || '').replace(/^#/, '')).get('tgWebAppData'); if (d) return d; } catch (e) {}
+  try { const d = new URLSearchParams(location.search).get('tgWebAppData'); if (d) return d; } catch (e) {}
+  return '';
+}
+function showDiag() {
+  try {
+    if (document.getElementById('diagBox')) return;
+    const keys = o => { try { return Object.keys(o || {}).slice(0, 40).join(',') } catch (e) { return '?' } };
+    const g = Object.keys(window).filter(k => /tele|catu|static|webapp|tg|cat/i.test(k)).slice(0, 30).join(',');
+    const t = [
+      'DIAG (сделай скриншот и пришли)',
+      'Telegram: ' + (typeof window.Telegram) + ' keys=' + keys(window.Telegram),
+      'WebApp keys=' + keys(tg),
+      'initData len=' + (tg && tg.initData ? tg.initData.length : 0) + ' unsafe.user=' + !!(tg && tg.initDataUnsafe && tg.initDataUnsafe.user),
+      'platform=' + (tg && tg.platform) + ' ver=' + (tg && tg.version),
+      'hash=' + (location.hash || '').slice(0, 50) + ' (' + (location.hash || '').length + ')',
+      'search=' + (location.search || '').slice(0, 50),
+      'globals=' + g,
+      'UA=' + navigator.userAgent.slice(0, 90)
+    ].join('\n');
+    const p = document.createElement('pre'); p.id = 'diagBox';
+    p.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:99999;background:#000c;color:#9f9;font:11px/1.35 monospace;padding:8px;border-radius:8px;white-space:pre-wrap;word-break:break-all;max-height:45vh;overflow:auto';
+    p.textContent = t; p.onclick = () => p.remove(); document.body.appendChild(p);
+  } catch (e) {}
+}
+const U = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || (() => { try { const u = new URLSearchParams(getInitData()).get('user'); return u ? JSON.parse(u) : null; } catch (e) { return null; } })() || null;
 let NAME = U ? ([U.first_name, U.last_name].filter(Boolean).join(' ') || 'Игрок') : 'Игрок';
 const UNAME = U && U.username ? '@' + U.username : '';
 let LOCAL_ACCOUNT_ID = '';
-try { LOCAL_ACCOUNT_ID = (localStorage.getItem('staticgrame_account_id_v1') || '').replace(/\D/g,''); if (!LOCAL_ACCOUNT_ID) { LOCAL_ACCOUNT_ID = String(rndInt(90000000)+10000000); localStorage.setItem('staticgrame_account_id_v1', LOCAL_ACCOUNT_ID); } } catch(e) { LOCAL_ACCOUNT_ID = 'SG-LOCAL'; }
+try { LOCAL_ACCOUNT_ID = (localStorage.getItem('catugram_account_id_v1') || '').replace(/\D/g,''); if (!LOCAL_ACCOUNT_ID) { LOCAL_ACCOUNT_ID = String(rndInt(90000000)+10000000); localStorage.setItem('catugram_account_id_v1', LOCAL_ACCOUNT_ID); } } catch(e) { LOCAL_ACCOUNT_ID = 'SG-LOCAL'; }
 const ACCOUNT_ID = U && U.id ? String(U.id) : LOCAL_ACCOUNT_ID;
 function setAvatar(el) {
   if (U && U.photo_url) { const i = document.createElement('img'); i.src = U.photo_url; i.alt = ''; i.onerror = () => { el.textContent = NAME[0].toUpperCase(); }; el.appendChild(i); }
@@ -825,12 +852,12 @@ function setAvatar(el) {
 
 /* ---------- сервер (используется только если задан API_URL) ---------- */
 async function apiCall(path, body) {
-  const r = await fetch(CFG.API_URL + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Init-Data': (tg && tg.initData) || '' }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(CFG.API_URL + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Init-Data': getInitData() }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || j.detail || 'Ошибка сервера');
   return j;
 }
-async function syncState() { if (!REMOTE) return; try { const r = await apiCall('/state'); Object.assign(S, r.state); setOnline(r.online); lastDep = S.deposited || 0; render(); } catch (e) { toast('Нет связи: ' + ((e && e.message) || e), true); } }
+async function syncState() { if (!REMOTE) return; try { const r = await apiCall('/state'); Object.assign(S, r.state); setOnline(r.online); lastDep = S.deposited || 0; render(); } catch (e) { toast('Нет связи: ' + ((e && e.message) || e), true); if (/initData|Открой игру|подпись/i.test((e && e.message) || '')) showDiag(); } }
 
 /* ---------- утилиты ---------- */
 function rndInt(n) { const a = new Uint32Array(1), lim = Math.floor(4294967296 / n) * n; do { crypto.getRandomValues(a); } while (a[0] >= lim); return a[0] % n; }
@@ -1320,7 +1347,7 @@ function renderProfile() {
 }
 
 
-/* ================= КАТАЛОГ 20 ИГР · ДЕМО STATICGRAME ================= */
+/* ================= КАТАЛОГ 20 ИГР · CATUGRAM ================= */
 const GAME_META = {
  mines:['💣','Мины','Открывай клетки и избегай мин. Это локальная демонстрационная версия.',['Клетка 1','Клетка 2','Клетка 3','Забрать']],
  ladder:['🪜','Лестница','Поднимайся по ступеням и забирай очки до неудачного шага.',['Левый путь','Правый путь','Забрать']],
@@ -1347,8 +1374,8 @@ const GAME_LABELS = Object.fromEntries([
 let activeGame = null, genericRound = 0, genericMultiplier = 1, genericStarted = false;
 const MINES_GRID = 16, MINES_EDGE = 0.15;
 let minesCount = 3, minesRound = null;
-try { minesRound = JSON.parse(localStorage.getItem('staticgrame_mines_round_v1') || 'null'); } catch(e) { minesRound = null; }
-function saveMinesRound(){ try { if(minesRound) localStorage.setItem('staticgrame_mines_round_v1',JSON.stringify(minesRound)); else localStorage.removeItem('staticgrame_mines_round_v1'); } catch(e){} }
+try { minesRound = JSON.parse(localStorage.getItem('catugram_mines_round_v1') || 'null'); } catch(e) { minesRound = null; }
+function saveMinesRound(){ try { if(minesRound) localStorage.setItem('catugram_mines_round_v1',JSON.stringify(minesRound)); else localStorage.removeItem('catugram_mines_round_v1'); } catch(e){} }
 function minesMultiplier(opened, count){ if(!opened) return 1; let num=1, den=1; for(let i=0;i<opened;i++){num*=MINES_GRID-i;den*=MINES_GRID-count-i;} return (1-MINES_EDGE)*num/den; }
 function openGame(key) {
   if (key === 'wheel' || key === 'dice' || key === 'upgrade') { setView(key); return; }

@@ -129,7 +129,7 @@ async def tg(method: str, **params):
 def check_init_data(raw: str) -> dict:
     """Проверка подписи initData (алгоритм Telegram WebApp). Возвращает dict user."""
     if not raw:
-        raise HTTPException(401, "Открой игру из Telegram")
+        raise HTTPException(401, "Нет данных запуска (initData пуст). Открой игру через бота в Catugram")
     data = dict(parse_qsl(raw, keep_blank_values=True))
     got = data.pop("hash", "")
     check = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
