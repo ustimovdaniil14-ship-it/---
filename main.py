@@ -40,6 +40,19 @@ RTP, MAX_BET, DEP_MAX, WD_LIMIT, WD_MIN = 0.85, 5000, 100000, 50000, 10  # ми�
 INIT_BONUS = 0  # стартовый баланс новым игрокам
 
 app = FastAPI()
+
+from starlette.exceptions import HTTPException as StarletteHTTPException
+import traceback
+
+@app.exception_handler(StarletteHTTPException)
+async def http_err(request, exc):          # фронт читает поле "error", а не "detail"
+    return JSONResponse({"error": exc.detail, "detail": exc.detail}, status_code=exc.status_code)
+
+@app.exception_handler(Exception)
+async def any_err(request, exc):           # причина видна и в игре, и в логах Render
+    traceback.print_exc()
+    msg = f"{type(exc).__name__}: {str(exc)[:160]}"
+    return JSONResponse({"error": msg, "detail": msg}, status_code=500)
 pool: asyncpg.Pool
 http = httpx.AsyncClient(timeout=20)
 
