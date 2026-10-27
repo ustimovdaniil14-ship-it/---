@@ -718,7 +718,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
     <div class="games-head"><div><h2>Топы</h2><p>Лучшие выигрыши в звёздах</p></div></div>
     <div class="tabs" id="topTabs" hidden></div>
     <div id="topList"></div>
-    <p class="tnote">Игроки с пометкой «демо» — примеры для оформления. Настоящий рейтинг появится, когда подключён сервер (API_URL).</p>
+    
   </section>
 
     <!-- ПРОФИЛЬ -->
@@ -1640,17 +1640,15 @@ sheetBody.addEventListener('change',e=>{if(e.target.id!=='avFile'||!e.target.fil
 const _settle=settle;
 settle=function(g,b,p,x,s){_settle(g,b,p,x,s);if(p>b){S.top=S.top||{};const a=(S.top[g]=S.top[g]||[]);a.push({w:p-b,x:x||0,ts:Date.now()});a.sort((m,n)=>n.w-m.w);S.top[g]=a.slice(0,10);save()}};
 const TOP_G=[['all','🏆 Все'],['wheel','🎡 Колесо'],['upgrade','🚀 Апгрейдер']].concat(Object.keys(GAME_META).map(k=>[k,GAME_META[k][0]+' '+GAME_META[k][1]]));
-const DEMO_N=['Alex','Мира','Коля','Dana','Тимур','Sofi','Макс','Ника','Leo'];
 let topG='all';
-function demoRows(g){let h=0;for(const ch of g)h=(h*31+ch.charCodeAt(0))>>>0;const r=()=>(h=(h*1664525+1013904223)>>>0)/4294967296;
-  let w=18000+r()*30000;return DEMO_N.map(n=>({n,w:Math.floor(w*=.62+r()*.25),demo:1,hue:Math.floor(r()*360)}))}
+/* настоящий рейтинг: лучшие выигрыши реальных игроков приходят с сервера (S.top_list) */
 function renderTop(){
   topG='all';
-  const mine=topG==='all'?S.best:((S.top&&S.top[topG]&&S.top[topG][0])||{w:0}).w;
-  const rows=demoRows(topG);if(mine>0)rows.push({n:NAME,w:mine,me:1});
-  rows.sort((a,b)=>b.w-a.w);const top=rows.slice(0,10),medal=['🥇','🥈','🥉'];
-  let html=top.map((r,i)=>`<div class="trow${r.me?' me':''}" style="animation-delay:${i*.04}s"><b class="rk">${medal[i]||i+1}</b>`+(r.me?'<div class="tav avatar" id="topMeAv"></div>':`<div class="tav" style="background:hsl(${r.hue} 38% 34%)">${r.n[0]}</div>`)+`<span class="tn">${r.me?'Ты':r.n}${r.demo?'<em>демо</em>':''}</span><b class="tw">⭐ ${fmt(r.w)}</b></div>`).join('');
-  if(!mine)html+='<p class="tnote">Выиграй звёзды — и ты появишься в списке.</p>';
+  const tt=$('topTabs'); if(tt) tt.style.display='none';
+  const medal=['🥇','🥈','🥉'];
+  const rows=(S.top_list||[]).map(r=>({n:String(r.n||'Игрок'),w:r.w,me:String(r.id)===String(ACCOUNT_ID),hue:(Number(r.id)*37)%360}));
+  let html=rows.map((r,i)=>`<div class="trow${r.me?' me':''}" style="animation-delay:${i*.04}s"><b class="rk">${medal[i]||i+1}</b>`+(r.me?'<div class="tav avatar" id="topMeAv"></div>':`<div class="tav" style="background:hsl(${r.hue} 38% 34%)">${(r.n[0]||'И').toUpperCase()}</div>`)+`<span class="tn">${r.me?'Ты':r.n.replace(/[<>&]/g,'')}</span><b class="tw">⭐ ${fmt(r.w)}</b></div>`).join('');
+  if(!rows.length) html='<p class="tnote">Пока в рейтинге никого нет. Выиграй звёзды — и ты будешь первым.</p>';
   $('topList').innerHTML=html;if($('topMeAv'))setAvatar($('topMeAv'))}
 $('topTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){topG=b.dataset.k;tick();renderTop()}});
 const _sv=setView;

@@ -173,6 +173,7 @@ async def build_state(c, uid):
                 wh.append({"w": 1 if m.get("p", 0) > 0 else 0, "x": m.get("x")})
         else:
             out_ops.append({"k": o["kind"], "a": o["amount"], "id": o["ref"] or f"op{o['id']}", "ts": o["ts"], "promo": m.get("promo")})
+    top = await c.fetch("select id,name,best from users where best>0 order by best desc limit 10")
     now = int(time.time() * 1000)
     online = await c.fetchval("select count(*) from users where last_seen>$1", now - 120000)
     return {
@@ -184,6 +185,7 @@ async def build_state(c, uid):
             "wd": {"d": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "u": int(used)},
             "ban": -1 if u["ban_until"] == -1 else (u["ban_until"] if u["ban_until"] > now else 0),
             "freeze": u["freeze_until"] if u["freeze_until"] > now else 0,
+            "top_list": [{"id": r["id"], "n": ((r["name"] or "Игрок").split() or ["Игрок"])[0][:16], "w": r["best"]} for r in top],
             "is_admin": uid in ADMINS,   # только для показа панели; права проверяются на каждый /admin запрос
         }}
 
