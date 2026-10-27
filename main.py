@@ -271,28 +271,45 @@ async def deposit_chat(req: Request, x_init_data: str = Header("")):
              payload=f"dep:{uid}:{a}", currency="XTR", prices=[{"label": "Звёзды", "amount": a}])
     return {"ok": True}
 
+async def credit_deposit(uid: int, amount: int, ref: str):
+    """Начисляет пополнение ровно один раз (ref уникален: повторная доставка не задвоит)."""
+    async with pool.acquire() as c, c.transaction():
+        await c.execute("insert into users(id,name,username,balance,last_seen) values($1,'Игрок','',0,0) on conflict(id) do nothing", uid)
+        ins = await c.execute("insert into ops(user_id,kind,amount,ref,ts) values($1,'dep',$2,$3,$4) on conflict(ref) do nothing",
+                              uid, amount, ref, int(time.time() * 1000))
+        if ins.endswith("1"):
+            await c.execute("update users set balance=balance+$2, deposited=deposited+$2 where id=$1", uid, amount)
+            print(f"DEPOSIT credited user={uid} amount={amount} ref={ref}")
+        else:
+            print(f"DEPOSIT duplicate ref={ref}")
+
 @app.post("/tg/{secret}")
 async def tg_webhook(secret: str, req: Request):
     if not WEBHOOK_SECRET or not hmac.compare_digest(secret, WEBHOOK_SECRET):
         return JSONResponse({"ok": False}, 403)
-    up = await req.json()
-    if "pre_checkout_query" in up:
-        await tg("answerPreCheckoutQuery", pre_checkout_query_id=up["pre_checkout_query"]["id"], ok=True)
-    msg = up.get("message") or {}
-    sp = msg.get("successful_payment")
-    if sp:
-        kind, uid, _ = sp["invoice_payload"].split(":")
-        amount = int(sp["total_amount"])                    # берём сумму из платежа, а не из payload
-        charge = sp["telegram_payment_charge_id"]
-        async with pool.acquire() as c, c.transaction():
-            # ref unique -> повторная доставка вебхука не начислит дважды
-            ins = await c.execute("insert into ops(user_id,kind,amount,ref,ts) values($1,'dep',$2,$3,$4) on conflict(ref) do nothing",
-                                  int(uid), amount, charge, int(time.time() * 1000))
-            if ins.endswith("1"):
-                await c.execute("update users set balance=balance+$2, deposited=deposited+$2 where id=$1", int(uid), amount)
-    elif (msg.get("text") or "").startswith("/start"):
-        await tg("sendMessage", chat_id=msg["chat"]["id"], text="Нажми кнопку меню, чтобы открыть игры.")
+    try:
+        up = await req.json()
+        msg = up.get("message") or {}
+        print("UPDATE:", [k for k in up.keys() if k != "update_id"], "payment" if msg.get("successful_payment") else "")
+        if "pre_checkout_query" in up:
+            await tg("answerPreCheckoutQuery", pre_checkout_query_id=up["pre_checkout_query"]["id"], ok=True)
+        sp = msg.get("successful_payment")
+        if sp:
+            print("PAYMENT:", json.dumps(sp, ensure_ascii=False)[:400])
+            parts = str(sp.get("invoice_payload", "")).split(":")
+            uid = int(parts[1]) if len(parts) >= 3 and parts[1].isdigit() else int((msg.get("from") or {}).get("id") or 0)
+            amount = int(sp.get("total_amount") or (parts[2] if len(parts) >= 3 else 0))   # сумма из платежа, не из клиента
+            ref = sp.get("telegram_payment_charge_id") or sp.get("provider_payment_charge_id") or f"upd{up.get('update_id')}"
+            if uid and amount > 0:
+                await credit_deposit(uid, amount, str(ref))
+            else:
+                print("PAYMENT ignored: нет uid/amount", uid, amount)
+        elif (msg.get("text") or "").startswith("/start"):
+            await tg("sendMessage", chat_id=msg["chat"]["id"], text="Нажми кнопку «Играть», чтобы открыть игры.")
+    except Exception:
+        traceback.print_exc()      # всегда отвечаем 200, ошибка видна в логах Render
     return {"ok": True}
+
 
 # ---------------------------------------------------------------- вывод
 @app.post("/withdraw")

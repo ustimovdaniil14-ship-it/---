@@ -751,6 +751,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
     <div class="card account-id-card"><div class="cap">Твой ID в Catugram</div><div class="account-id-row"><b id="accountIdText">—</b><button class="pbtn" id="copyAccountId">Копировать ID</button></div></div>
     <div class="sec">Промокод</div>
     <div class="card"><div class="avrow"><input class="admin-input" id="promoIn" placeholder="Введи промокод" maxlength="20" style="margin:0"><button class="pbtn main" id="promoGo">Активировать</button></div></div>
+    <div id="admWrap">
     <div class="sec">Панель администратора</div>
     <div class="card admin-card" style="display:none"><div class="admin-warning">Тестовый интерфейс · выдача другим аккаунтам требует подключённого сервера и проверки прав администратора.</div>
       <label class="admin-label" for="grantUserId">ID получателя</label><input class="admin-input" id="grantUserId" inputmode="numeric" placeholder="Например, 123456789">
@@ -768,6 +769,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
       <input class="admin-input" id="pCode" placeholder="КОД" maxlength="20"><input class="admin-input" id="pStars" type="number" value="500" placeholder="Звёзд" inputmode="numeric"><input class="admin-input" id="pUses" type="number" value="10" placeholder="Активаций" inputmode="numeric">
       <button class="pbtn main admin-submit" data-a="promo">Создать</button><div id="pList"></div>
       <div class="sec" style="font-size:19px;margin-top:18px">База покупок</div><div id="pur"></div>
+    </div>
     </div>
     <div class="sec">Игровая статистика</div>
     <div id="pStats"></div>
@@ -989,7 +991,7 @@ function customDeposit() {
 async function depositViaChat(a) {
   try {
     await apiCall('/deposit_chat', { amount: a });
-    toast('Счёт отправлен в чат с ботом. Оплати его там');
+    toast('Оплата в игре недоступна (' + LAST_ERR + '). Счёт отправлен в чат с ботом');
     setTimeout(() => { try { tg.close(); } catch (e) {} }, 900);
   } catch (e) { toast(e.message, true); openDeposit(); }
 }
@@ -1031,6 +1033,27 @@ async function autoSync() {
 setInterval(autoSync, 12000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
 
+let LAST_ERR = 'нет openInvoice';
+/* открывает оплату внутри игры; возвращает 'invoice' (с колбэком), 'openTelegramLink'/'openLink' (без колбэка) или '' */
+function openInvoiceInApp(link, cb) {
+  const slug = (link.match(/invoice\/([^/?#]+)/) || [])[1];
+  const links = [link]; if (slug) links.push('https://t.me/$' + slug);
+  if (tg && typeof tg.openInvoice === 'function') {
+    for (const v of links) { try { tg.openInvoice(v, cb); return 'invoice'; } catch (e) { LAST_ERR = 'openInvoice: ' + ((e && e.message) || e); } }
+  }
+  for (const m of ['openTelegramLink', 'openLink']) {
+    if (tg && typeof tg[m] === 'function') { try { tg[m](link); return m; } catch (e) { LAST_ERR = m + ': ' + ((e && e.message) || e); } }
+  }
+  return '';
+}
+/* после открытия оплаты без колбэка: ждём зачисления до 3 минут */
+async function watchDeposit() {
+  for (let i = 0; i < 60; i++) {
+    await sleep(3000);
+    const d = await pullState();
+    if (d > 0) { popBalance(); haptic('success'); toast('Звёзды зачислены: +' + fmt(d) + ' ⭐'); return; }
+  }
+}
 async function startDeposit(a) {
   if (REMOTE) {
     try {
@@ -1040,11 +1063,10 @@ async function startDeposit(a) {
         else if (st === 'failed') toast('Платёж не прошёл', true);
         else openDeposit();
       };
-      const slug = (r.link.match(/invoice\/([^/?#]+)/) || [])[1];
-      const variants = [r.link]; if (slug) variants.push('https://t.me/$' + slug);
-      let opened = false;
-      for (const v of variants) { try { tg.openInvoice(v, onSt); opened = true; break; } catch (e) {} }
-      if (!opened) await depositViaChat(a);
+      const how = openInvoiceInApp(r.link, onSt);
+      if (how === 'invoice') return;                       // окно оплаты прямо в игре, onSt сообщит результат
+      if (how) { toast('Оплати счёт в открывшемся окне: звёзды зачислятся сами'); watchDeposit(); return; }
+      await depositViaChat(a);                             // совсем крайний случай: счёт в чат с ботом
     } catch (e) { toast(e.message, true); openDeposit(); }
     return;
   }
@@ -2127,7 +2149,16 @@ opRow = function (o) {
 $('aMyId').onclick = () => { $('aTo').value = ACCOUNT_ID; toast('ID подставлен'); };
 /* ---- серверные правки: админка видна только админам, промокоды и админ-действия идут на сервер ---- */
 const _renderBase = render;
-render = function () { _renderBase.apply(this, arguments); document.querySelectorAll('#adm2, .admin-card').forEach(e => { e.style.display = (S.is_admin && e.id === 'adm2') ? '' : 'none'; }); enforce(); };
+const admWrap = $('admWrap'), admMark = document.createComment('adm');
+admWrap.parentNode.insertBefore(admMark, admWrap); admWrap.remove();     // у обычных игроков панели нет в странице вообще
+const _renderAdminBase = renderAdmin;
+renderAdmin = function () { if (!$('pList')) return; return _renderAdminBase.apply(this, arguments); };
+render = function () {
+  _renderBase.apply(this, arguments);
+  if (S.is_admin) { if (!admWrap.isConnected) admMark.parentNode.insertBefore(admWrap, admMark.nextSibling); }   // только по ответу сервера
+  else if (admWrap.isConnected) admWrap.remove();
+  enforce();
+};
 $('promoGo').onclick = async () => {
   const code = $('promoIn').value.trim().toUpperCase();
   try { const r = await apiCall('/promo', { code }); await syncState(); popBalance(); haptic('success'); $('promoIn').value = ''; toast('+' + fmt(r.stars) + ' ⭐ по промокоду'); }
