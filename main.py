@@ -31,7 +31,9 @@ TG_API_BASE = os.environ.get("TG_API_BASE", "https://bot.catup.lol").rstrip("/")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 # Render сам кладёт адрес сервиса в RENDER_EXTERNAL_URL, отдельно задавать не нужно
 PUBLIC_URL = (os.environ.get("PUBLIC_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "").rstrip("/")
-ADMINS = {int(x) for x in os.environ.get("ADMIN_IDS", "1780243247,1780243478,1780243322").split(",") if x.strip()}
+import re
+# принимает любой формат: "1,2,3", "{1, 2, 3}", "[1 2 3]"; если переменная пустая или в ней нет цифр — берётся список по умолчанию
+ADMINS = {int(x) for x in re.findall(r"\d+", os.environ.get("ADMIN_IDS", ""))} or {1780243247, 1780243478, 1780243322}
 AUTO_PAYOUT = os.environ.get("AUTO_PAYOUT", "1") == "1"   # автовывод включён по умолчанию
 
 RTP, MAX_BET, DEP_MAX, WD_LIMIT, WD_MIN = 0.85, 5000, 100000, 50000, 10  # мин. вывод 10 ⭐ (правило Catugram)
@@ -81,16 +83,29 @@ async def startup():
     async with pool.acquire() as c:
         await c.execute(SCHEMA)
     if PUBLIC_URL:
-        await tg("setWebhook", url=f"{PUBLIC_URL}/tg/{WEBHOOK_SECRET}")
-        try:                                          # кнопка меню бота открывает мини-апп
-            await tg("setChatMenuButton", menu_button={"type": "web_app", "text": "Играть", "web_app": {"url": PUBLIC_URL}})
-        except Exception as e:
-            print("setChatMenuButton:", e, "(задай Web App вручную в BotFather)")
+        asyncio.create_task(ensure_webhook())      # в фоне: сервер стартует даже если вебхук пока не встал
     async with pool.acquire() as c:   # после рестарта вернуть "зависшие" выплаты в очередь (request_id защищает от двойной выплаты)
         await c.execute("update withdrawals set status='pending' where status='processing'")
     asyncio.create_task(payout_worker())
 
 # ---------------------------------------------------------------- Telegram
+async def ensure_webhook():
+    """Ставит вебхук и кнопку меню; при ошибке (напр. CONFLICT: другой бот на этом токене опрашивает getUpdates) повторяет."""
+    while True:
+        try:
+            try: await tg("deleteWebhook")
+            except Exception: pass
+            await tg("setWebhook", url=f"{PUBLIC_URL}/tg/{WEBHOOK_SECRET}")
+            print("webhook ok:", PUBLIC_URL)
+            try:
+                await tg("setChatMenuButton", menu_button={"type": "web_app", "text": "Играть", "web_app": {"url": PUBLIC_URL}})
+            except Exception as e:
+                print("setChatMenuButton:", e, "(задай Web App вручную в BotFather)")
+            return
+        except Exception as e:
+            print("setWebhook failed:", e, "- повтор через 20 с. Если CONFLICT: останови старый бот, который опрашивает getUpdates с этим токеном")
+            await asyncio.sleep(20)
+
 async def tg(method: str, **params):
     r = await http.post(f"{TG_API_BASE}/bot{BOT_TOKEN}/{method}", json={k: v for k, v in params.items() if v is not None})
     j = r.json()
