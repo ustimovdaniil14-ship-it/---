@@ -560,7 +560,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
       <button data-v="inv"><svg class="ic"><use href="#i-star"/></svg>NFT</button>
       <button data-v="profile"><svg class="ic"><use href="#i-user"/></svg>Профиль</button>
     </nav>
-  <div class="testbar" id="testbar" hidden>Тестовый режим: пополнение и вывод проходят без реальных платежей, всё хранится на этом телефоне</div>
+  <div class="testbar" id="testbar" hidden></div>
 
 
   <!-- КАТАЛОГ ОСНОВНЫХ ИГР -->
@@ -587,7 +587,6 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
 
 <button class="game-tile" data-game="plinko"><span class="game-emoji">⚪</span><span class="game-name">Плинко</span><small>Шарик падает по полю; крупные множители выпадают реже.</small><span class="tile-arrow">Играть <b>↗</b></span></button>
 </div>
-    <p class="demo-note">Игровые звёзды Catugram · только внутренние очки. Коэффициенты выплат снижены; результаты случайны. Баланс хранится на сервере.</p>
   </section>
 
   <section class="view" id="v-game">
@@ -605,7 +604,6 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
     </div>
     <div class="game-actions" id="gameActions"></div>
     <button class="game-back" id="gameBack2">← Все игры</button>
-    <p class="demo-note">Только локальная игровая симуляция. Нет реальных платежей, вывода средств или обмена на деньги.</p>
   </section>
 
   <!-- КОЛЕСО -->
@@ -726,7 +724,7 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
     <button class="pback" id="pBack"><svg class="ic"><use href="#i-chev"/></svg>к играм</button>
     <div class="pass">
       <div class="avatar" id="avBig"></div>
-      <div><div class="pn" id="nmBig"></div><div class="un" id="unBig"></div><button class="pbtn avedit" id="avEdit">Сменить аватар</button></div>
+      <div><div class="pn" id="nmBig"></div><div class="un" id="unBig"></div></div>
     </div>
     <div class="bigbal"><svg class="ic"><use href="#i-star"/></svg><span id="pBal">0</span><small>на счету</small></div>
     <div class="acts">
@@ -742,10 +740,9 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
     <button class="more" id="wOps">вся история →</button>
     <div class="sec">Честность игр</div>
     <div class="fair-card">
-      <div class="fair-top"><span class="fair-icon">✦</span><div><b>Прозрачные правила</b><small>Сначала правила — потом раунд</small></div><span class="fair-status">DEMO</span></div>
+      <div class="fair-top"><span class="fair-icon">✦</span><div><b>Прозрачные правила</b><small>Сначала правила — потом раунд</small></div></div>
       <p>Каждый раунд рассчитывается отдельно, а результат и изменение баланса показываются сразу после игры. Не нужно верить красивой анимации — смотри на итог раунда и историю операций.</p>
       <div class="fair-points"><div><span>01</span><b>Один раунд</b><small>Новый запуск — новый результат.</small></div><div><span>02</span><b>История</b><small>Последние операции доступны в профиле.</small></div><div><span>03</span><b>Без обещаний</b><small>Анимация не гарантирует выигрыш.</small></div></div>
-      <div class="fair-note">Важно: сейчас это демо-режим. Результаты генерируются на устройстве и не проходят независимую проверку честности (provably fair). Очки внутри демо не являются деньгами.</div>
     </div>
     <div class="sec">ID аккаунта</div>
     <div class="card account-id-card"><div class="cap">Твой ID в Catugram</div><div class="account-id-row"><b id="accountIdText">—</b><button class="pbtn" id="copyAccountId">Копировать ID</button></div></div>
@@ -753,13 +750,13 @@ body[data-view="game"] .app{padding-bottom:calc(30px + env(safe-area-inset-botto
     <div class="card"><div class="avrow"><input class="admin-input" id="promoIn" placeholder="Введи промокод" maxlength="20" style="margin:0"><button class="pbtn main" id="promoGo">Активировать</button></div></div>
     <div id="admWrap">
     <div class="sec">Панель администратора</div>
-    <div class="card admin-card" style="display:none"><div class="admin-warning">Тестовый интерфейс · выдача другим аккаунтам требует подключённого сервера и проверки прав администратора.</div>
+    <div class="card admin-card" style="display:none"><div class="admin-warning">Выдача звёзд</div>
       <label class="admin-label" for="grantUserId">ID получателя</label><input class="admin-input" id="grantUserId" inputmode="numeric" placeholder="Например, 123456789">
       <label class="admin-label" for="grantAmount">Сколько звёзд выдать</label><input class="admin-input" id="grantAmount" type="number" min="1" max="1000000" value="1000" inputmode="numeric">
-      <button class="pbtn main admin-submit" id="grantStarsBtn">Выдать ⭐</button><div class="admin-foot" id="grantStatus">Без серверной интеграции изменения не попадут на другие аккаунты.</div>
+      <button class="pbtn main admin-submit" id="grantStarsBtn">Выдать ⭐</button><div class="admin-foot" id="grantStatus"></div>
     </div>
     <div class="card" id="adm2">
-      <div class="sec" style="font-size:19px;margin:0 0 6px">Выдача звёзд по ID</div><div class="admin-warning">Введи ID игрока (или оставь пустым — выдать себе). ID виден в профиле. Начисление хранится в локальной базе: на чужое устройство дойдёт только через сервер (API_URL).</div>
+      <div class="sec" style="font-size:19px;margin:0 0 6px">Выдача звёзд по ID</div><div class="admin-warning">Введи ID игрока (или оставь пустым — выдать себе). ID виден в профиле. Начисление сохраняется на сервере и сразу видно игроку.</div>
       <label class="admin-label">Кому: ID или @username (пусто — мне)</label><input class="admin-input" id="aTo" placeholder="12345678 или @name" inputmode="text"><button class="pbtn" id="aMyId" type="button" style="margin:2px 0 4px;padding:10px">Подставить мой ID</button>
       <label class="admin-label">Звёзд</label><input class="admin-input" id="aAmt" type="number" value="1000" inputmode="numeric">
       <label class="admin-label">Дней (бан / заморозка)</label><input class="admin-input" id="aDays" type="number" value="3" inputmode="numeric">
@@ -1010,8 +1007,9 @@ async function waitDeposit(a) {
   waitingDep = true;
   openSheet(`<div class="spin"></div><div class="sh-title">Зачисляем звёзды</div>` +
     `<div class="sh-text">Платёж на <b>${fmt(a)} ⭐</b> получен. Обычно это занимает несколько секунд, иногда до пары минут.</div>`);
-  for (let i = 0; i < 20; i++) {            // ждём около 40 секунд
-    await sleep(2000);
+  for (let i = 0; i < 40; i++) {            // первые секунды проверяем каждую секунду
+    await sleep(i < 15 ? 1000 : 2500);
+    try { await apiCall('/deposit/check', {}); } catch (e) {}
     const d = await pullState();
     if (d > 0) {
       waitingDep = false; popBalance(); haptic('success');
@@ -1037,8 +1035,10 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) auto
 let LAST_ERR = 'нет openInvoice';
 /* открывает оплату внутри игры; возвращает 'invoice' (с колбэком), 'openTelegramLink'/'openLink' (без колбэка) или '' */
 function openInvoiceInApp(link, cb) {
-  const slug = (link.match(/invoice\/([^/?#]+)/) || [])[1];
-  const links = [link]; if (slug) links.push('https://t.me/$' + slug);
+  let slug = '';
+  try { slug = new URL(link).pathname.split('/').filter(Boolean).pop() || ''; } catch (e) { slug = String(link).split(/[/?#]/).filter(Boolean).pop() || ''; }
+  slug = slug.replace(/^\$/, '');
+  const links = [link]; if (slug) links.push('https://t.me/$' + slug, 'https://t.me/invoice/' + slug);
   if (tg && typeof tg.openInvoice === 'function') {
     for (const v of links) { try { tg.openInvoice(v, cb); return 'invoice'; } catch (e) { LAST_ERR = 'openInvoice: ' + ((e && e.message) || e); } }
   }
@@ -1049,8 +1049,9 @@ function openInvoiceInApp(link, cb) {
 }
 /* после открытия оплаты без колбэка: ждём зачисления до 3 минут */
 async function watchDeposit() {
-  for (let i = 0; i < 60; i++) {
-    await sleep(3000);
+  for (let i = 0; i < 90; i++) {
+    await sleep(2000);
+    try { await apiCall('/deposit/check', {}); } catch (e) {}
     const d = await pullState();
     if (d > 0) { popBalance(); haptic('success'); toast('Звёзды зачислены: +' + fmt(d) + ' ⭐'); return; }
   }
@@ -1077,7 +1078,7 @@ async function startDeposit(a) {
     `<div class="sh-text">Пополнить баланс на <b>${fmt(a)} ⭐</b>?</div>` +
     `<button class="cta gold" id="cOk">Подтвердить ⭐ ${fmt(a)}</button>` +
     `<button class="ghost" id="cNo">Отмена</button>` +
-    `<div class="sh-note">Тестовый режим: реальные звёзды не списываются</div>`);
+    ``);
   $('cNo').onclick = closeSheet;
   $('cOk').onclick = () => {
     S.balance += a; S.deposited += a;
@@ -1372,7 +1373,7 @@ function renderProfile() {
 
 /* ================= КАТАЛОГ 20 ИГР · CATUGRAM ================= */
 const GAME_META = {
- mines:['💣','Мины','Открывай клетки и избегай мин. Это локальная демонстрационная версия.',['Клетка 1','Клетка 2','Клетка 3','Забрать']],
+ mines:['💣','Мины','Открывай клетки и избегай мин. Чем дальше, тем выше множитель.',['Клетка 1','Клетка 2','Клетка 3','Забрать']],
  ladder:['🪜','Лестница','Поднимайся по ступеням и забирай очки до неудачного шага.',['Левый путь','Правый путь','Забрать']],
  crash:['📈','Краш','Множитель растёт — нажми «Забрать» до виртуального краша.',['Начать раунд','Забрать']],
  bj:['🃏','Блэкджек','Сравни руку с дилером. Набери как можно ближе к 21.',['Взять карту','Хватит']],
@@ -1406,7 +1407,7 @@ function openGame(key) {
   if(key==='mines') { $('gameActions').innerHTML=''; $('gameTitle').textContent='Мины'; $('gameDesc').textContent='Открывай безопасные клетки и забирай выигрыш до попадания на мину.'; $('genericBet').value = minesRound ? minesRound.bet : Math.max(1,Math.min(bet,S.balance||100)); setView('game'); renderMines(); return; }
   genericRound = 0; genericMultiplier = 1; genericStarted = false;
   const tile = document.querySelector(`[data-game="${key}"]`);
-  const meta = GAME_META[key] || [tile?.querySelector('.game-emoji')?.textContent || '🎮', GAME_LABELS[key] || key, 'Демо-игра.', ['Играть']];
+  const meta = GAME_META[key] || [tile?.querySelector('.game-emoji')?.textContent || '🎮', GAME_LABELS[key] || key, '', ['Играть']];
   $('gameTitle').textContent = meta[1]; $('gameDesc').textContent = meta[2] || tile?.querySelector('small')?.textContent || '';
   $('genericBet').value = Math.max(1, Math.min(bet, S.balance || 100));
   const display=$('gameDisplay'); display.classList.remove('mines-display','roulette-display','spinning');
@@ -1616,16 +1617,21 @@ x.globalAlpha=q.a*(.6+.4*Math.sin(t/700+q.p));x.fillStyle='#e6c88f';x.beginPath(
 /* ================= v2: АВАТАР ================= */
 const AV_KEY='sg_avatar_v1', AV_EMO=['😎','🦊','🐼','🐯','🦁','👑','💎','🔥','🚀','🎩','🐉','🦄'], AV_BG=['#17181f','#5b2333','#16404a','#3b2a5c','#4a3a12','#1d4a35'];
 let AV=null; try{AV=JSON.parse(localStorage.getItem(AV_KEY)||'null')}catch(e){}
-const _setAv=setAvatar;
+AV=null; try{localStorage.removeItem(AV_KEY)}catch(e){}          // старые ручные аватарки больше не используются
+const avBucket=()=>Math.floor(Date.now()/120000);                    // раз в 2 минуты картинка перезапрашивается
 setAvatar=function(el){el.innerHTML='';el.style.background='';el.classList.remove('emo');
-  if(AV&&AV.t==='img'){const i=document.createElement('img');i.src=AV.src;i.alt='';el.appendChild(i);return}
-  if(AV&&AV.t==='emo'){el.textContent=AV.e;el.style.background=AV.bg;el.classList.add('emo');return}
-  _setAv(el)};
+  el.textContent=((typeof NAME==='string'&&NAME)||'И')[0].toUpperCase();   // пока грузится или если фото нет: первая буква
+  if(!REMOTE)return;
+  const i=new Image();i.alt='';i.onload=()=>{el.innerHTML='';el.appendChild(i)};
+  i.src=CFG.API_URL+'/avatar/'+encodeURIComponent(ACCOUNT_ID)+'?v='+avBucket()};
+const refreshAvatars=()=>['avTop','avBig','topMeAv'].forEach(id=>$(id)&&setAvatar($(id)));
+setInterval(refreshAvatars,120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAvatars()});
 function saveAv(){try{AV?localStorage.setItem(AV_KEY,JSON.stringify(AV)):localStorage.removeItem(AV_KEY)}catch(e){toast('Фото слишком большое для памяти телефона',true)}
   ['avTop','avBig','topMeAv'].forEach(id=>$(id)&&setAvatar($(id)))}
 function avSheet(){const cur=AV&&AV.t==='emo'?AV:{e:AV_EMO[0],bg:AV_BG[0]};
   openSheet('<div class="sh-title">Аватар</div><div class="avgrid" id="avE">'+AV_EMO.map(e=>`<button data-e="${e}" class="${AV&&AV.e===e?'sel':''}">${e}</button>`).join('')+'</div><div class="avgrid cols" id="avC">'+AV_BG.map(c=>`<button data-c="${c}" style="background:${c}" class="${cur.bg===c?'sel':''}"></button>`).join('')+'</div><div class="avrow"><button class="pbtn main" id="avPick">Из галереи</button><button class="pbtn" id="avReset">Сбросить</button></div><input id="avFile" type="file" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"><div class="sh-title" style="font-size:18px;margin-top:14px">Никнейм</div><div class="avrow"><input class="admin-input" id="nickIn" maxlength="20" value="'+NAME.replace(/"/g,"")+'" style="margin:0"><button class="pbtn main" id="nickSave">Сохранить</button></div>')}
-$('avEdit').onclick=$('avBig').onclick=avSheet;
+/* аватар теперь берётся из Catugram автоматически, ручной смены нет */
 sheetBody.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.e){AV={t:'emo',e:b.dataset.e,bg:(AV&&AV.bg)||AV_BG[1]};saveAv();avSheet()}
   else if(b.dataset.c){AV={t:'emo',e:(AV&&AV.e)||AV_EMO[0],bg:b.dataset.c};saveAv();avSheet()}
@@ -1646,8 +1652,8 @@ function renderTop(){
   topG='all';
   const tt=$('topTabs'); if(tt) tt.style.display='none';
   const medal=['🥇','🥈','🥉'];
-  const rows=(S.top_list||[]).map(r=>({n:String(r.n||'Игрок'),w:r.w,me:String(r.id)===String(ACCOUNT_ID),hue:(Number(r.id)*37)%360}));
-  let html=rows.map((r,i)=>`<div class="trow${r.me?' me':''}" style="animation-delay:${i*.04}s"><b class="rk">${medal[i]||i+1}</b>`+(r.me?'<div class="tav avatar" id="topMeAv"></div>':`<div class="tav" style="background:hsl(${r.hue} 38% 34%)">${(r.n[0]||'И').toUpperCase()}</div>`)+`<span class="tn">${r.me?'Ты':r.n.replace(/[<>&]/g,'')}</span><b class="tw">⭐ ${fmt(r.w)}</b></div>`).join('');
+  const rows=(S.top_list||[]).map(r=>({id:r.id,n:String(r.n||'Игрок'),w:r.w,me:String(r.id)===String(ACCOUNT_ID),hue:(Number(r.id)*37)%360}));
+  let html=rows.map((r,i)=>`<div class="trow${r.me?' me':''}" style="animation-delay:${i*.04}s"><b class="rk">${medal[i]||i+1}</b>`+(r.me?'<div class="tav avatar" id="topMeAv"></div>':`<div class="tav" style="position:relative;overflow:hidden;background:hsl(${r.hue} 38% 34%)">${(r.n[0]||'И').toUpperCase()}<img alt="" src="${CFG.API_URL}/avatar/${r.id}?v=${avBucket()}" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></div>`)+`<span class="tn">${r.me?'Ты':r.n.replace(/[<>&]/g,'')}</span><b class="tw">⭐ ${fmt(r.w)}</b></div>`).join('');
   if(!rows.length) html='<p class="tnote">Пока в рейтинге никого нет. Выиграй звёзды — и ты будешь первым.</p>';
   $('topList').innerHTML=html;if($('topMeAv'))setAvatar($('topMeAv'))}
 $('topTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){topG=b.dataset.k;tick();renderTop()}});

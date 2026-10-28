@@ -100,6 +100,7 @@ async def startup():
     async with pool.acquire() as c:   # после рестарта вернуть "зависшие" выплаты в очередь (request_id защищает от двойной выплаты)
         await c.execute("update withdrawals set status='pending' where status='processing'")
     asyncio.create_task(payout_worker())
+    asyncio.create_task(deposit_worker())
 
 # ---------------------------------------------------------------- Telegram
 async def ensure_webhook():
@@ -260,7 +261,7 @@ async def deposit(req: Request, x_init_data: str = Header("")):
     async with pool.acquire() as c:
         uid = await auth(c, x_init_data)
     link = await tg("createInvoiceLink", title="Пополнение", description=f"{a} игровых звёзд",
-                    payload=f"dep:{uid}:{a}", currency="XTR", prices=[{"label": "Звёзды", "amount": a}])
+                    payload=f"dep:{uid}:{a}:{secrets.token_hex(6)}", currency="XTR", prices=[{"label": "Звёзды", "amount": a}])
     return {"link": link}
 
 @app.post("/deposit_chat")
@@ -270,11 +271,16 @@ async def deposit_chat(req: Request, x_init_data: str = Header("")):
     async with pool.acquire() as c:
         uid = await auth(c, x_init_data)
     await tg("sendInvoice", chat_id=uid, title="Пополнение", description=f"{a} игровых звёзд",
-             payload=f"dep:{uid}:{a}", currency="XTR", prices=[{"label": "Звёзды", "amount": a}])
+             payload=f"dep:{uid}:{a}:{secrets.token_hex(6)}", currency="XTR", prices=[{"label": "Звёзды", "amount": a}])
     return {"ok": True}
 
-async def credit_deposit(uid: int, amount: int, ref: str):
-    """Начисляет пополнение ровно один раз (ref уникален: повторная доставка не задвоит)."""
+def deposit_ref(payload: str, charge_id: str) -> str:
+    """Ключ единственного зачисления: код из счёта (n:...) либо id платежа для старых счетов."""
+    p = str(payload or "").split(":")
+    return f"n:{p[3]}" if len(p) >= 4 and p[3] else str(charge_id)
+
+async def credit_deposit(uid: int, amount: int, ref: str) -> bool:
+    """Начисляет пополнение ровно один раз (ref уникален: вебхук и сверка вместе не задвоят)."""
     async with pool.acquire() as c, c.transaction():
         await c.execute("insert into users(id,name,username,balance,last_seen) values($1,'Игрок','',0,0) on conflict(id) do nothing", uid)
         ins = await c.execute("insert into ops(user_id,kind,amount,ref,ts) values($1,'dep',$2,$3,$4) on conflict(ref) do nothing",
@@ -282,8 +288,51 @@ async def credit_deposit(uid: int, amount: int, ref: str):
         if ins.endswith("1"):
             await c.execute("update users set balance=balance+$2, deposited=deposited+$2 where id=$1", uid, amount)
             print(f"DEPOSIT credited user={uid} amount={amount} ref={ref}")
-        else:
-            print(f"DEPOSIT duplicate ref={ref}")
+            return True
+        return False
+
+async def reconcile(uid: int | None = None) -> int:
+    """
+    Сверка с журналом звёзд бота (getStarTransactions): находит оплаченные счета пополнения и зачисляет их.
+    Работает независимо от вебхука, поэтому баланс пополняется сразу после оплаты.
+    """
+    credited, offset = 0, 0
+    for _ in range(10):                                   # до 1000 последних операций
+        res = await tg("getStarTransactions", offset=offset, limit=100)
+        txs = res.get("transactions") or []
+        if not txs: break
+        for t in txs:
+            src = t.get("source") or {}
+            payload = src.get("invoice_payload") or ""
+            parts = str(payload).split(":")
+            if len(parts) < 3 or parts[0] != "dep" or not parts[1].isdigit(): continue
+            puid, amount = int(parts[1]), int(t.get("amount") or 0)
+            if (uid is not None and puid != uid) or amount <= 0: continue
+            payer = (src.get("user") or {}).get("id")
+            if payer and int(payer) != puid: continue     # платил тот же человек, чей id в счёте
+            if await credit_deposit(puid, amount, deposit_ref(payload, t.get("id"))):
+                credited += amount
+        if len(txs) < 100: break
+        offset += len(txs)
+    return credited
+
+_last_check: dict[int, float] = {}
+
+@app.post("/deposit/check")
+async def deposit_check(x_init_data: str = Header("")):
+    async with pool.acquire() as c:
+        uid = await auth(c, x_init_data)
+    if time.time() - _last_check.get(uid, 0) < 0.8:       # не чаще раза в ~секунду на игрока
+        return {"credited": 0}
+    _last_check[uid] = time.time()
+    return {"credited": await reconcile(uid)}
+
+async def deposit_worker():
+    """Подстраховка: раз в 30 секунд сверяет журнал звёзд, даже если игрок закрыл игру."""
+    while True:
+        await asyncio.sleep(30)
+        try: await reconcile()
+        except Exception as e: print("deposit_worker:", e)
 
 @app.post("/tg/{secret}")
 async def tg_webhook(secret: str, req: Request):
@@ -301,7 +350,8 @@ async def tg_webhook(secret: str, req: Request):
             parts = str(sp.get("invoice_payload", "")).split(":")
             uid = int(parts[1]) if len(parts) >= 3 and parts[1].isdigit() else int((msg.get("from") or {}).get("id") or 0)
             amount = int(sp.get("total_amount") or (parts[2] if len(parts) >= 3 else 0))   # сумма из платежа, не из клиента
-            ref = sp.get("telegram_payment_charge_id") or sp.get("provider_payment_charge_id") or f"upd{up.get('update_id')}"
+            charge = sp.get("telegram_payment_charge_id") or sp.get("provider_payment_charge_id") or f"upd{up.get('update_id')}"
+            ref = deposit_ref(sp.get("invoice_payload"), charge)
             if uid and amount > 0:
                 await credit_deposit(uid, amount, str(ref))
             else:
@@ -426,6 +476,41 @@ async def admin(req: Request, x_init_data: str = Header("")):
         elif a == "unban":  await c.execute("update users set ban_until=0, freeze_until=0 where id=$1", target)
         else: err("Неизвестное действие")
         return {"ok": True}
+
+# ---------------------------------------------------------------- аватарки из Catugram
+from fastapi.responses import Response
+import mimetypes
+_av_cache: dict[int, tuple[float, bytes | None, str]] = {}
+AV_TTL = 120   # секунд: сменил фото в Catugram, в игре оно обновится в течение пары минут
+
+@app.get("/avatar/{uid}")
+async def avatar(uid: int):
+    """Текущая фотография профиля из Catugram (через getUserProfilePhotos). Токен бота наружу не отдаётся."""
+    hit = _av_cache.get(uid)
+    if hit and time.time() - hit[0] < (AV_TTL if hit[1] else 60):
+        data, ctype = hit[1], hit[2]
+    else:
+        async with pool.acquire() as c:
+            known = await c.fetchval("select 1 from users where id=$1", uid)
+        if not known:
+            raise HTTPException(404, "Нет такого игрока")
+        data, ctype = None, "image/jpeg"
+        try:
+            ph = await tg("getUserProfilePhotos", user_id=uid, limit=1)
+            if ph.get("total_count") and ph.get("photos"):
+                sizes = ph["photos"][0]
+                pick = next((x for x in sizes if x.get("width", 0) >= 160), sizes[-1])   # не самый тяжёлый размер
+                f = await tg("getFile", file_id=pick["file_id"])
+                r = await http.get(f"{TG_API_BASE}/file/bot{BOT_TOKEN}/{f['file_path']}")
+                if r.status_code == 200 and r.content:
+                    data = r.content
+                    ctype = (r.headers.get("content-type") or mimetypes.guess_type(f["file_path"])[0] or "image/jpeg").split(";")[0]
+        except Exception as e:
+            print("avatar:", uid, e)
+        _av_cache[uid] = (time.time(), data, ctype)
+    if not data:
+        raise HTTPException(404, "Нет фото")
+    return Response(content=data, media_type=ctype, headers={"Cache-Control": f"public, max-age={AV_TTL}"})
 
 # ---------------------------------------------------------------- статика
 @app.get("/")
