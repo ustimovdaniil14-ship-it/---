@@ -27,7 +27,12 @@ _TOKEN_CANDIDATES = [t for t in [
 ] if t]
 BOT_TOKEN = _TOKEN_CANDIDATES[0]
 DATABASE_URL = os.environ["DATABASE_URL"]
-TG_API_BASE = os.environ.get("TG_API_BASE", "https://bot.catup.lol").rstrip("/")
+def _norm_base(v: str) -> str:
+    v = "".join((v or "").split())                      # убираем пробелы, переводы строк, невидимые разделители
+    if not v: v = "https://bot.catup.lol"
+    if not v.startswith("http"): v = "https://" + v
+    return v.rstrip("/")
+TG_API_BASE = _norm_base(os.environ.get("TG_API_BASE", ""))
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 # Render сам кладёт адрес сервиса в RENDER_EXTERNAL_URL, отдельно задавать не нужно
 PUBLIC_URL = (os.environ.get("PUBLIC_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "").rstrip("/")
@@ -134,7 +139,7 @@ async def tg(method: str, **params):
             last = e; print(f"tg {method}: сетевой сбой ({type(e).__name__}: {e}), попытка {attempt + 1}")
             await asyncio.sleep(0.7 * (attempt + 1))
     else:
-        raise RuntimeError("Сервер Catugram временно недоступен, повтори через пару секунд")
+        raise RuntimeError(f"Нет связи с {TG_API_BASE} ({type(last).__name__}). Проверь /health/api")
     j = r.json()
     if not j.get("ok"):
         raise RuntimeError(f"{method}: {j.get('description')}")
@@ -202,6 +207,22 @@ async def build_state(c, uid):
             "top_list": [{"id": r["id"], "n": ((r["name"] or "Игрок").split() or ["Игрок"])[0][:16], "w": r["best"]} for r in top],
             "is_admin": uid in ADMINS,   # только для показа панели; права проверяются на каждый /admin запрос
         }}
+
+@app.get("/health/api")
+async def health_api():
+    """Диагностика связи сервера с Catugram: адрес, DNS и getMe. Токен не показывается."""
+    import socket, urllib.parse
+    host = urllib.parse.urlparse(TG_API_BASE).hostname or ""
+    out = {"base": TG_API_BASE, "host": host}
+    try:
+        out["dns"] = sorted({a[4][0] for a in socket.getaddrinfo(host, 443)})
+    except Exception as e:
+        out["dns_error"] = f"{type(e).__name__}: {e}"
+    try:
+        me = await tg("getMe"); out["ok"] = True; out["bot"] = me.get("username")
+    except Exception as e:
+        out["ok"] = False; out["error"] = str(e)
+    return out
 
 @app.get("/health")
 async def health():
