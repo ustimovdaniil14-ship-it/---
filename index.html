@@ -2169,7 +2169,7 @@ $('promoGo').onclick = async () => {
   try { const r = await apiCall('/promo', { code }); await syncState(); popBalance(); haptic('success'); $('promoIn').value = ''; toast('+' + fmt(r.stars) + ' ⭐ по промокоду'); }
   catch (e) { toast(e.message, true); }
 };
-$('adm2').addEventListener('click', async e => {
+admWrap.querySelector('#adm2').addEventListener('click', async e => {
   const b = e.target.closest('[data-a]'); if (!b || b.dataset.a === 'promo' || b.dataset.a === 'zeroall') return;
   setTimeout(syncState, 600);
 }, true);

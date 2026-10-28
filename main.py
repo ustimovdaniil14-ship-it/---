@@ -41,6 +41,9 @@ INIT_BONUS = 0  # стартовый баланс новым игрокам
 
 app = FastAPI()
 
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)   # страница 500 КБ -> ~120 КБ по сети
+
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import traceback
 
@@ -54,7 +57,7 @@ async def any_err(request, exc):           # причина видна и в и�
     msg = f"{type(exc).__name__}: {str(exc)[:160]}"
     return JSONResponse({"error": msg, "detail": msg}, status_code=500)
 pool: asyncpg.Pool
-http = httpx.AsyncClient(timeout=20)
+http = httpx.AsyncClient(timeout=20, transport=httpx.AsyncHTTPTransport(retries=3))   # повтор при сбое соединения/DNS
 
 SCHEMA = """
 create table if not exists users(
@@ -92,7 +95,7 @@ async def startup():
         print("ВНИМАНИЕ: ни один токен не прошёл getMe")
     if not WEBHOOK_SECRET:                            # стабильный секрет вебхука, считается из токена
         WEBHOOK_SECRET = hashlib.sha256(("wh:" + BOT_TOKEN).encode()).hexdigest()[:40]
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=8)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=8, max_inactive_connection_lifetime=120)   # Neon засыпает: не держим протухшие соединения
     async with pool.acquire() as c:
         await c.execute(SCHEMA)
     if PUBLIC_URL:
@@ -101,6 +104,7 @@ async def startup():
         await c.execute("update withdrawals set status='pending' where status='processing'")
     asyncio.create_task(payout_worker())
     asyncio.create_task(deposit_worker())
+    asyncio.create_task(keepalive())
 
 # ---------------------------------------------------------------- Telegram
 async def ensure_webhook():
@@ -121,7 +125,16 @@ async def ensure_webhook():
             await asyncio.sleep(20)
 
 async def tg(method: str, **params):
-    r = await http.post(f"{TG_API_BASE}/bot{BOT_TOKEN}/{method}", json={k: v for k, v in params.items() if v is not None})
+    last = None
+    for attempt in range(4):                       # временный сбой DNS/сети: повторяем с паузой
+        try:
+            r = await http.post(f"{TG_API_BASE}/bot{BOT_TOKEN}/{method}", json={k: v for k, v in params.items() if v is not None})
+            break
+        except httpx.TransportError as e:
+            last = e; print(f"tg {method}: сетевой сбой ({type(e).__name__}: {e}), попытка {attempt + 1}")
+            await asyncio.sleep(0.7 * (attempt + 1))
+    else:
+        raise RuntimeError("Сервер Catugram временно недоступен, повтори через пару секунд")
     j = r.json()
     if not j.get("ok"):
         raise RuntimeError(f"{method}: {j.get('description')}")
@@ -189,6 +202,18 @@ async def build_state(c, uid):
             "top_list": [{"id": r["id"], "n": ((r["name"] or "Игрок").split() or ["Игрок"])[0][:16], "w": r["best"]} for r in top],
             "is_admin": uid in ADMINS,   # только для показа панели; права проверяются на каждый /admin запрос
         }}
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+async def keepalive():
+    """Render (бесплатный тариф) усыпляет сервис через ~15 минут без запросов. Пока он бодрствует, пингуем сам себя."""
+    if not PUBLIC_URL: return
+    while True:
+        await asyncio.sleep(240)
+        try: await http.get(f"{PUBLIC_URL}/health")
+        except Exception as e: print("keepalive:", e)
 
 @app.get("/state")
 async def state(x_init_data: str = Header("")):
