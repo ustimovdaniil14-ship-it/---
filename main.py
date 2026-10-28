@@ -91,7 +91,7 @@ async def startup():
     global pool, BOT_TOKEN, WEBHOOK_SECRET
     for t in _TOKEN_CANDIDATES:                       # выбрать рабочий токен
         try:
-            r = await http.get(f"{TG_API_BASE}/bot{t}/getMe")
+            r = await api_http("GET", f"/bot{t}/getMe")
             if r.json().get("ok"):
                 BOT_TOKEN = t; print("bot ok:", r.json()["result"].get("username")); break
         except Exception as e:
@@ -129,11 +129,43 @@ async def ensure_webhook():
             print("setWebhook failed:", e, "- повтор через 20 с. Если CONFLICT: останови старый бот, который опрашивает getUpdates с этим токеном")
             await asyncio.sleep(20)
 
+import urllib.parse as _up
+doh_http = httpx.AsyncClient(timeout=6)
+_dns_cache: dict[str, tuple[float, str]] = {}
+
+async def doh_resolve(host: str) -> str | None:
+    """Если DNS на Render не находит адрес Catugram, спрашиваем его через DNS-over-HTTPS (Cloudflare, затем Google)."""
+    hit = _dns_cache.get(host)
+    if hit and time.time() - hit[0] < 300:
+        return hit[1]
+    for url in ("https://1.1.1.1/dns-query", "https://8.8.8.8/resolve"):
+        try:
+            r = await doh_http.get(url, params={"name": host, "type": "A"}, headers={"accept": "application/dns-json"})
+            for a in r.json().get("Answer", []):
+                if a.get("type") == 1:
+                    _dns_cache[host] = (time.time(), a["data"]); return a["data"]
+        except Exception as e:
+            print("doh", url, type(e).__name__, e)
+    return None
+
+async def api_http(verb: str, path: str, **kw):
+    """HTTP-запрос к Catugram: обычный, а при сбое DNS/соединения повтор по IP из DNS-over-HTTPS (с верным именем сервера для TLS)."""
+    try:
+        return await http.request(verb, f"{TG_API_BASE}{path}", **kw)
+    except httpx.TransportError as first:
+        host = _up.urlparse(TG_API_BASE).hostname or ""
+        ip = await doh_resolve(host)
+        if not ip:
+            raise first
+        print(f"api_http: {type(first).__name__}, повтор по IP {ip}")
+        headers = {**(kw.pop("headers", None) or {}), "Host": host}
+        return await http.request(verb, f"https://{ip}{path}", headers=headers, extensions={"sni_hostname": host}, **kw)
+
 async def tg(method: str, **params):
     last = None
     for attempt in range(4):                       # временный сбой DNS/сети: повторяем с паузой
         try:
-            r = await http.post(f"{TG_API_BASE}/bot{BOT_TOKEN}/{method}", json={k: v for k, v in params.items() if v is not None})
+            r = await api_http("POST", f"/bot{BOT_TOKEN}/{method}", json={k: v for k, v in params.items() if v is not None})
             break
         except httpx.TransportError as e:
             last = e; print(f"tg {method}: сетевой сбой ({type(e).__name__}: {e}), попытка {attempt + 1}")
@@ -218,6 +250,7 @@ async def health_api():
         out["dns"] = sorted({a[4][0] for a in socket.getaddrinfo(host, 443)})
     except Exception as e:
         out["dns_error"] = f"{type(e).__name__}: {e}"
+    out["doh"] = await doh_resolve(host)
     try:
         me = await tg("getMe"); out["ok"] = True; out["bot"] = me.get("username")
     except Exception as e:
@@ -547,7 +580,7 @@ async def avatar(uid: int):
                 sizes = ph["photos"][0]
                 pick = next((x for x in sizes if x.get("width", 0) >= 160), sizes[-1])   # не самый тяжёлый размер
                 f = await tg("getFile", file_id=pick["file_id"])
-                r = await http.get(f"{TG_API_BASE}/file/bot{BOT_TOKEN}/{f['file_path']}")
+                r = await api_http("GET", f"/file/bot{BOT_TOKEN}/{f['file_path']}")
                 if r.status_code == 200 and r.content:
                     data = r.content
                     ctype = (r.headers.get("content-type") or mimetypes.guess_type(f["file_path"])[0] or "image/jpeg").split(";")[0]
